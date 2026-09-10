@@ -261,7 +261,7 @@ Panel {
       onTextKey: function(t) {
         if (t === "n" || t === "N") root.hoverCol = -1
         else if (t === "t" || t === "T") root.cycleHourFormatEverywhere()
-        else if (t === "p" || t === "P") root.copyScreenshot()
+        else if (t === "p" || t === "P" || t === "y" || t === "Y") root.copyScreenshot()
         else if (t === "r" || t === "R") root.refresh()
         else if (t === "w" || t === "W") root.openWorldtimebuddy()
       }

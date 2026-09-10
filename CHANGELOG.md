@@ -15,7 +15,7 @@
   (AM/PM, based on #4 by ryanyogan) and `utc` (24-hour plus a UTC reference
   row under home). `t` in the popup cycles through them for the session, on
   every monitor at once; also exposed as `toggleHourFormat` over IPC.
-- `p` in the popup copies it as a PNG to the clipboard, selected column and
+- `p` (or `y`, vim yank) in the popup copies it as a PNG to the clipboard, selected column and
   converted times included, for sharing a meeting slot. Also `screenshot`
   over IPC.
 - New default bar icon `` (fa-bars_staggered, U+EE19). Falls back to the

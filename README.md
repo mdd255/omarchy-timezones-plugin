@@ -50,7 +50,7 @@ mouse needed):
 | `h` / `l`, `←` / `→` | Step the selected column back / forward. The first press starts from the current hour. |
 | `n` | Back to now (clear the selection) |
 | `t` | Cycle the display mode: 24h → AM/PM → UTC (see `hourFormat`) |
-| `p` | Copy the popup as a PNG to the clipboard, selected column included — hover a future meeting slot, hit `p`, paste it to the people in it |
+| `p` / `y` | Copy the popup as a PNG to the clipboard, selected column included — hover a future meeting slot, hit `p`, paste it to the people in it |
 | `r` | Refresh timezone offsets |
 | `w` | Open worldtimebuddy.com |
 | `Esc` | Close |
