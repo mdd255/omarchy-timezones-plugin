@@ -3,7 +3,7 @@
 A minimal world clock for the [Omarchy](https://omarchy.org/) bar, inspired by
 [worldtimebuddy.com](https://www.worldtimebuddy.com/).
 
-https://github.com/user-attachments/assets/703ba5b8-68bd-4694-bb8f-91f41424505d
+https://github.com/user-attachments/assets/a7331091-9311-4ace-9f88-e05948ee1e34
 
 A single globe icon in the bar expands to your zones' current times on hover.
 Clicking it opens an hour-grid popup: one 24-hour strip per timezone, all
@@ -150,3 +150,9 @@ special.
 ```sh
 omarchy plugin remove io.github.sspaeti.timezones
 ```
+
+## Previous video
+
+https://github.com/user-attachments/assets/703ba5b8-68bd-4694-bb8f-91f41424505d
+
+
