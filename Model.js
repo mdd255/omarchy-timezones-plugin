@@ -75,10 +75,53 @@ function pad2(n) {
   return (n < 10 ? "0" : "") + n
 }
 
-// "07:12" for a zone right now.
-function timeLabel(nowUtcMs, offsetMin) {
+// 0 → 12, 13 → 1: the hour as a 12-hour clock reads it.
+function hour12(hour) {
+  var h = hour % 12
+  return h === 0 ? 12 : h
+}
+
+// "07:12" for a zone right now, or "7:12 AM" in 12-hour mode.
+function timeLabel(nowUtcMs, offsetMin, use12Hour) {
   var f = localFields(nowUtcMs, offsetMin)
-  return pad2(f.hour) + ":" + pad2(f.minute)
+  if (!use12Hour) return pad2(f.hour) + ":" + pad2(f.minute)
+  return hour12(f.hour) + ":" + pad2(f.minute) + (f.hour < 12 ? " AM" : " PM")
+}
+
+// One grid cell's hour. The 12-hour form stays as short as worldtimebuddy's
+// ("1p", "11a") because a cell is only wide enough for three characters.
+function hourLabel(hour, use12Hour) {
+  if (!use12Hour) return String(hour)
+  return hour12(hour) + (hour < 12 ? "a" : "p")
+}
+
+// Display modes, in the order the `t` key cycles them: 24-hour, AM/PM, and
+// 24-hour with a UTC reference row pinned under home.
+var HOUR_FORMATS = ["24h", "12h", "utc"]
+
+function normalizeHourFormat(value) {
+  var s = String(value === null || value === undefined ? "" : value).trim().toLowerCase()
+  return HOUR_FORMATS.indexOf(s) === -1 ? "24h" : s
+}
+
+function nextHourFormat(mode) {
+  var i = HOUR_FORMATS.indexOf(normalizeHourFormat(mode))
+  return HOUR_FORMATS[(i + 1) % HOUR_FORMATS.length]
+}
+
+// The reference row "utc" mode adds. Offset 0 needs no probing.
+function utcZone() {
+  return { label: "UTC", shortLabel: "UTC", abbr: "", home: false, utc: true, offsetMin: 0 }
+}
+
+// Zone rows with the UTC reference inserted right after the home row (or
+// first, when no row is home) — the anchor and its reference read together.
+function withUtcRow(zones) {
+  var out = zones.slice()
+  var at = 0
+  for (var i = 0; i < out.length; i++) if (out[i].home) { at = i + 1; break }
+  out.splice(at, 0, utcZone())
+  return out
 }
 
 // "Thu 21 Aug" style date for the row header.
@@ -105,12 +148,12 @@ function nowColumn(nowUtcMs, dayStartUtcMs) {
 }
 
 // Compact bar label shown on hover: "NY 07:12 · SF 04:12 · CDO 19:12".
-function compactLabel(zones, nowUtcMs) {
+function compactLabel(zones, nowUtcMs, use12Hour) {
   var parts = []
   for (var i = 0; i < zones.length; i++) {
     var z = zones[i]
     if (z.home || z.offsetMin === undefined || z.offsetMin === null) continue
-    parts.push(plainText(z.shortLabel) + " " + timeLabel(nowUtcMs, z.offsetMin))
+    parts.push(plainText(z.shortLabel) + " " + timeLabel(nowUtcMs, z.offsetMin, use12Hour))
   }
   return parts.join(" · ")
 }
@@ -134,7 +177,13 @@ if (typeof module !== "undefined") {
     localFields: localFields,
     cell: cell,
     tintFor: tintFor,
+    hour12: hour12,
     timeLabel: timeLabel,
+    hourLabel: hourLabel,
+    normalizeHourFormat: normalizeHourFormat,
+    nextHourFormat: nextHourFormat,
+    utcZone: utcZone,
+    withUtcRow: withUtcRow,
     dateLabel: dateLabel,
     diffLabel: diffLabel,
     nowColumn: nowColumn,

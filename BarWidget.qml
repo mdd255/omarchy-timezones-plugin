@@ -12,9 +12,26 @@ BarWidget {
 
   // Sanitized because WidgetButton's internal Text uses AutoText, which
   // would rich-text-parse a crafted setting. See README's Configure section
-  // for why this glyph rather than the plain earth/globe ones, and for other
-  // icon choices.
-  readonly property string icon: Model.plainText(setting("icon", "󱉊"))
+  // for the default glyph, its fallback, and other icon choices.
+  readonly property string configuredIcon: Model.plainText(setting("icon", ""))
+
+  // Default glyph is fa-bars_staggered (U+EE19), a Font Awesome 6 glyph Nerd
+  // Fonts only carry since v3.3. An older Nerd Font would draw a tofu box, so
+  // probe fontconfig once — Qt falls back through the same tables — and use
+  // md-web_clock (U+F124A, in every Nerd Font since 3.0) when nothing has it.
+  property bool defaultGlyphAvailable: false
+  readonly property string icon: configuredIcon !== "" ? configuredIcon
+    : defaultGlyphAvailable ? "" : "󱉊"
+
+  Process {
+    id: glyphProbe
+    command: ["fc-list", ":charset=ee19", "family"]
+    running: true
+    stdout: StdioCollector {
+      waitForEnd: true
+      onStreamFinished: root.defaultGlyphAvailable = String(text || "").trim() !== ""
+    }
+  }
   readonly property string wtbUrl: setting("worldtimebuddyUrl", "https://www.worldtimebuddy.com/pdt-to-switzerland-bern")
 
   // Set "hoverExpand": false on the widget entry to keep the pill a static
@@ -40,6 +57,24 @@ BarWidget {
 
   function togglePanel() {
     if (panelLoader.item && panelLoader.item.toggle) panelLoader.item.toggle()
+  }
+
+  function openWorldtimebuddy() {
+    if (root.bar) root.bar.run("omarchy-launch-browser " + Util.shellQuote(root.wtbUrl))
+  }
+
+  // A bar surface exists per monitor, so flip every instance — otherwise the
+  // display mode would change on one screen and not the others.
+  function cycleHourFormat() {
+    broadcast("cycleHourFormatHere")
+  }
+
+  function cycleHourFormatHere() {
+    if (panelLoader.item && panelLoader.item.cycleHourFormat) panelLoader.item.cycleHourFormat()
+  }
+
+  function screenshot() {
+    if (panelLoader.item && panelLoader.item.copyScreenshot) panelLoader.item.copyScreenshot()
   }
 
   // Shape contract for shell.summon/hide/toggle routing (Bar.findPanelWidget
@@ -89,6 +124,8 @@ BarWidget {
     function hide(): void { root.close() }
     function toggle(): void { root.togglePanel() }
     function refresh(): void { root.refresh() }
+    function toggleHourFormat(): void { root.cycleHourFormat() }
+    function screenshot(): void { root.screenshot() }
   }
 
   WidgetButton {
@@ -105,7 +142,7 @@ BarWidget {
 
     onPressed: function(b) {
       if (!root.bar) return
-      if (b === Qt.RightButton) root.bar.run("omarchy-launch-browser " + Util.shellQuote(root.wtbUrl))
+      if (b === Qt.RightButton) root.openWorldtimebuddy()
       else if (b === Qt.MiddleButton) root.refresh()
       else root.togglePanel()
     }

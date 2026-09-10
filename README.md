@@ -42,6 +42,27 @@ omarchy plugin add https://github.com/sspaeti/omarchy-timezones-plugin.git --ena
 - **Middle click**: refresh timezone offsets
 - **Right click**: open worldtimebuddy.com in the browser
 
+Keyboard, while the popup is open (also works when summoned by hotkey, no
+mouse needed):
+
+| Key | Action |
+|---|---|
+| `h` / `l`, `←` / `→` | Step the selected column back / forward. The first press starts from the current hour. |
+| `n` | Back to now (clear the selection) |
+| `t` | Cycle the display mode: 24h → AM/PM → UTC (see `hourFormat`) |
+| `p` | Copy the popup as a PNG to the clipboard, selected column included — hover a future meeting slot, hit `p`, paste it to the people in it |
+| `r` | Refresh timezone offsets |
+| `w` | Open worldtimebuddy.com |
+| `Esc` | Close |
+
+The same actions are available over IPC, e.g. for a Hyprland keybind:
+
+```sh
+omarchy-shell io.github.sspaeti.timezones toggle             # open/close the popup
+omarchy-shell io.github.sspaeti.timezones toggleHourFormat   # 24h → 12h → utc
+omarchy-shell io.github.sspaeti.timezones screenshot         # copy the open popup to the clipboard
+```
+
 ## Configure
 
 Works out of the box with no configuration: the home row is **Omarchy's
@@ -54,7 +75,7 @@ To pick your own zones and labels, configure the widget entry in
 ```json
 {
   "id": "io.github.sspaeti.timezones",
-  "icon": "󱉊",
+  "hourFormat": "24h",
   "homeZones": ["Europe/Zurich", "Europe/Berlin"],
   "zones": [
     { "label": "Switzerland", "shortLabel": "CH", "zone": "", "home": true },
@@ -77,15 +98,26 @@ The bar icon can be changed with `icon` — see below for the default and altern
 - `homeZones` — system timezones that keep the home row's configured label.
   Outside this list (traveling), the home row is relabeled by where the system
   clock actually is. Empty (default): always label by the system timezone.
-- `icon` — bar glyph, default `󱉊` (md-web_clock: globe with a small clock
-  badge, most literally "timezone"). Not plain md-earth/md-globe — those
+- `hourFormat` — `"24h"` (default), `"12h"` or `"utc"`. One setting read by
+  the bar's hover view, the popup's row times and the hour grid, so they never
+  disagree. `"12h"` reads `7:12 AM` in the headers and `1a … 12p` in the grid;
+  `"utc"` keeps the 24-hour clock and pins a **UTC** reference row right under
+  home, so "14:00 UTC" can be hovered like any other zone. `t` in the popup
+  cycles through the three for the session; `hourFormat` decides where it
+  starts.
+- `icon` — bar glyph. Default `` (U+EE19, fa-bars_staggered: three staggered
+  bars, reads as stacked time strips). That glyph joined Nerd Fonts in v3.3
+  (Font Awesome 6), so on an older Nerd Font the widget falls back to `󱉊`
+  (U+F124A, md-web_clock: globe with a small clock badge) automatically — the
+  probe is a one-off `fc-list` at startup. Not plain md-earth/md-globe — those
   render 1-2px smaller and lower than sibling bar icons in JetBrainsMono
   Nerd Font at bar size, a per-glyph hinting quirk at small sizes, not a
   layout bug. Alternatives:
 
   | Glyph | Codepoint | Name | Notes |
   |---|---|---|---|
-  | `󱉊` | U+F124A | md-web_clock | globe with a small clock badge (default) |
+  | `` | U+EE19 | fa-bars_staggered | three staggered bars (default, Nerd Fonts ≥ 3.3) |
+  | `󱉊` | U+F124A | md-web_clock | globe with a small clock badge (fallback) |
   | `󰅐` | U+F0150 | md-clock_outline | plain clock, simplest shape, safest alignment |
   | `󰖟` | U+F059F | md-web | plain meridian globe, no continents |
 - `hoverExpand` — set `false` to keep the bar pill a static icon instead of

@@ -56,8 +56,16 @@ Panel {
     return false
   }
 
+  // An installed plugin may be handed a PluginBarApi facade rather than the
+  // Bar itself (Omarchy 4.x), and there this property is a read-only mirror —
+  // assigning to it throws, and the throw aborted close() before it reached
+  // controller.hide(), leaving the panel stuck open with its keyboard grab.
+  // Prefer the setter the facade exposes; keep the assignment for a host
+  // Bar with a writable property. (#8, #9)
   function setCenterHoverRevealSuppressed(value) {
-    if (root.bar && "centerHoverRevealSuppressed" in root.bar)
+    if (root.bar && typeof root.bar.setCenterHoverRevealSuppressed === "function")
+      root.bar.setCenterHoverRevealSuppressed(value)
+    else if (root.bar && "centerHoverRevealSuppressed" in root.bar)
       root.bar.centerHoverRevealSuppressed = value
   }
 
@@ -66,6 +74,30 @@ Panel {
   property double nowUtc: Date.now()
   property var offsets: ({})
   property string systemTz: ""
+
+  // ---- Display mode: "24h" (default), "12h" (AM/PM) or "utc" (24-hour plus
+  //      a UTC reference row under home). Seeded from shell.json, then owned
+  //      by the session so `t` in the popup cycles it without a config edit.
+  readonly property string configuredHourFormat: Model.normalizeHourFormat(setting("hourFormat", "24h"))
+  property string hourFormat: configuredHourFormat
+  onConfiguredHourFormatChanged: hourFormat = configuredHourFormat
+  readonly property bool use12Hour: hourFormat === "12h"
+  readonly property bool showUtc: hourFormat === "utc"
+
+  function cycleHourFormat() {
+    hourFormat = Model.nextHourFormat(hourFormat)
+  }
+
+  // A bar (and so a panel) exists per monitor; route through the host widget
+  // so every screen flips together rather than just this one.
+  function cycleHourFormatEverywhere() {
+    if (hostWidget && typeof hostWidget.cycleHourFormat === "function") hostWidget.cycleHourFormat()
+    else cycleHourFormat()
+  }
+
+  function openWorldtimebuddy() {
+    if (hostWidget && typeof hostWidget.openWorldtimebuddy === "function") hostWidget.openWorldtimebuddy()
+  }
 
   readonly property var zoneConfig: setting("zones", Model.defaultZones())
   // System timezones that keep the configured home label. Outside this list
@@ -98,7 +130,7 @@ Panel {
         offsetMin: probed ? probed.offsetMin : null
       })
     }
-    return out
+    return showUtc ? Model.withUtcRow(out) : out
   }
 
   readonly property var homeRow: {
@@ -111,8 +143,48 @@ Panel {
   readonly property string homeDate: ready ? Model.dateLabel(nowUtc, homeRow.offsetMin) : ""
   property int hoverCol: -1
 
+  // ---- Keyboard column selection (h/l, ←/→). Writes the same hoverCol the
+  //      mouse does, so a keypress and a hover are indistinguishable to the
+  //      rest of the panel. The first press steps off the column "now" sits
+  //      in — landing on it would look like nothing happened, since that is
+  //      exactly what the unselected headers already show.
+  function moveHoverCol(step) {
+    if (!ready) return
+    var from = hoverCol >= 0 ? hoverCol : Math.floor(nowCol)
+    hoverCol = Math.max(0, Math.min(23, from + step))
+  }
+
+  // The grid is one home day, so a stale selection would misread as "now"
+  // on the next open. Covers every close path, not just root.close().
+  onOpenedChanged: if (!opened) hoverCol = -1
+
   // What the bar pill shows on hover.
-  readonly property string compactLabel: ready ? Model.compactLabel(zones, nowUtc) : ""
+  readonly property string compactLabel: ready ? Model.compactLabel(zones, nowUtc, use12Hour) : ""
+
+  // ---- `p`: copy the popup as a PNG to the clipboard — hovered/selected
+  //      column and its converted times included — so a future meeting slot
+  //      can be shared as-is. Rendered from the scene, not the screen, so
+  //      nothing else on the desktop leaks into the image.
+  function copyScreenshot() {
+    // Climb from the content to the card (background + border) the panel
+    // draws — the first ancestor sized exactly contentWidth × contentHeight.
+    // Going any higher lands on Quickshell's window proxy items, which have
+    // no QML engine to grab with.
+    var card = keyCatcher
+    while (card.parent && !(card.width === panel.contentWidth && card.height === panel.contentHeight)) card = card.parent
+    if (!card.parent || typeof card.grabToImage !== "function") return
+    var dpr = panel.screen && panel.screen.devicePixelRatio > 0 ? panel.screen.devicePixelRatio : 1
+    var runtimeDir = Quickshell.env("XDG_RUNTIME_DIR") || "/tmp"
+    var path = runtimeDir + "/omarchy-timezones-panel.png"
+    card.grabToImage(function(result) {
+      if (!result || !result.saveToFile(path)) return
+      Quickshell.execDetached(["bash", "-c",
+        "wl-copy -t image/png < " + Util.shellQuote(path)
+        + " && { command -v omarchy-notification-send >/dev/null"
+        + " && omarchy-notification-send 'Timezones' 'Panel copied to clipboard' -t 2000"
+        + " || notify-send -t 2000 'Timezones' 'Panel copied to clipboard'; }"])
+    }, Qt.size(Math.ceil(card.width * dpr), Math.ceil(card.height * dpr)))
+  }
 
   // ---- Grid geometry.
   readonly property real cellW: Style.space(27)
@@ -183,6 +255,16 @@ Panel {
       anchors.fill: parent
       onCloseRequested: root.close()
       onTabRequested: function(direction) { root.switchPanel(direction) }
+      // ←/→ and h/l both arrive here — the catcher folds them into one signal
+      // and never forwards them to onTextKey.
+      onMoveRequested: function(dx, dy) { if (dx !== 0) root.moveHoverCol(dx) }
+      onTextKey: function(t) {
+        if (t === "n" || t === "N") root.hoverCol = -1
+        else if (t === "t" || t === "T") root.cycleHourFormatEverywhere()
+        else if (t === "p" || t === "P") root.copyScreenshot()
+        else if (t === "r" || t === "R") root.refresh()
+        else if (t === "w" || t === "W") root.openWorldtimebuddy()
+      }
 
       Column {
         id: rowsCol
@@ -244,8 +326,8 @@ Panel {
                 Text {
                   text: !zoneItem.rowReady ? "—"
                     : root.hoverCol >= 0
-                      ? Model.timeLabel(root.dayStart + root.hoverCol * 3600000, zoneItem.zoneRow.offsetMin)
-                      : Model.timeLabel(root.nowUtc, zoneItem.zoneRow.offsetMin)
+                      ? Model.timeLabel(root.dayStart + root.hoverCol * 3600000, zoneItem.zoneRow.offsetMin, root.use12Hour)
+                      : Model.timeLabel(root.nowUtc, zoneItem.zoneRow.offsetMin, root.use12Hour)
                   color: root.hoverCol >= 0 ? Color.accent : root.fg
                   font.family: root.fontFam
                   font.pixelSize: Style.font.body
@@ -292,7 +374,7 @@ Panel {
                     anchors.centerIn: parent
                     horizontalAlignment: Text.AlignHCenter
                     lineHeight: 0.85
-                    text: c.isMidnight ? c.dayLabel.replace(" ", "\n") : String(c.hour)
+                    text: c.isMidnight ? c.dayLabel.replace(" ", "\n") : Model.hourLabel(c.hour, root.use12Hour)
                     color: c.isMidnight ? root.fg
                          : c.tint === "night" ? Qt.darker(root.fg, 1.6)
                          : root.fg
