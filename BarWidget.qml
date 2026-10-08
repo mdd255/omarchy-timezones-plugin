@@ -40,7 +40,15 @@ BarWidget {
   readonly property bool hoverExpand: setting("hoverExpand", true) === true
 
   readonly property string compact: panelLoader.item ? panelLoader.item.compactLabel : ""
-  readonly property bool expanded: hoverExpand && !vertical && button.tooltipHovered && compact !== ""
+  // Local patch: zones with "expand": true are always shown in the bar; hover
+  // (when hoverExpand is on) reveals every zone.
+  readonly property string pinned: panelLoader.item ? panelLoader.item.pinnedLabel : ""
+  readonly property bool hovered: hoverExpand && button.tooltipHovered && compact !== ""
+  readonly property string shown: hovered ? compact : pinned
+  readonly property bool expanded: !vertical && shown !== ""
+  // Local patch: "showIcon": false hides the glyph while times are visible. The
+  // icon stays when there are no times, so the pill remains clickable.
+  readonly property bool showIcon: setting("showIcon", true) === true || !expanded
 
   function injectPanel() {
     var target = panelLoader.item
@@ -153,9 +161,10 @@ BarWidget {
     anchors.left: button.left
     anchors.leftMargin: button.scaledHorizontalMargin
     anchors.verticalCenter: button.verticalCenter
-    spacing: root.expanded ? Style.space(8) : 0
+    spacing: root.expanded && root.showIcon ? Style.space(8) : 0
 
     Text {
+      visible: root.showIcon
       text: root.icon
       textFormat: Text.PlainText
       color: button.active && button.useActiveColor ? button.activeColor : (root.bar ? root.bar.barForeground : Color.foreground)
@@ -166,7 +175,7 @@ BarWidget {
 
     Text {
       visible: root.expanded
-      text: root.compact
+      text: root.shown
       textFormat: Text.PlainText
       color: button.active && button.useActiveColor ? button.activeColor : (root.bar ? root.bar.barForeground : Color.foreground)
       font.family: button.fontFamily

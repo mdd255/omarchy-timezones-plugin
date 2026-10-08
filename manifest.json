@@ -1,11 +1,11 @@
 {
   "schemaVersion": 1,
-  "id": "io.github.sspaeti.timezones",
+  "id": "omarchy.timezones",
   "name": "Timezones",
   "version": "1.1.0",
-  "author": "Simon Späti",
+  "author": "Mdd255",
   "license": "MIT",
-  "description": "World clock bar pill with a worldtimebuddy-style hour-grid popup. Hover a column to convert any moment across all your zones.",
+  "description": "forked from io.github.sspaeti.timezones",
   "kinds": [
     "bar-widget"
   ],

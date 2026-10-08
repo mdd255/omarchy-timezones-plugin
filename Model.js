@@ -88,6 +88,31 @@ function timeLabel(nowUtcMs, offsetMin, use12Hour) {
   return hour12(f.hour) + ":" + pad2(f.minute) + (f.hour < 12 ? " AM" : " PM")
 }
 
+var MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
+
+// Local patch: custom date/time for a zone's bar text. Tokens (case-sensitive):
+//   HH 00-23   hh 01-12   mm minutes   A AM/PM   a am/pm
+//   ddd Mon    DD 01-31   D 1-31       MMM Oct   MM 01-12
+// Anything else is copied as-is, e.g. "HH:mm D MMM" -> "22:12 8 Oct".
+function formatTime(format, utcMs, offsetMin) {
+  var f = localFields(utcMs, offsetMin)
+  return String(format).replace(/HH|hh|mm|MMM|MM|ddd|DD|D|A|a/g, function (t) {
+    switch (t) {
+      case "HH": return pad2(f.hour)
+      case "hh": return pad2(hour12(f.hour))
+      case "mm": return pad2(f.minute)
+      case "A": return f.hour < 12 ? "AM" : "PM"
+      case "a": return f.hour < 12 ? "am" : "pm"
+      case "ddd": return WEEKDAYS[f.weekday]
+      case "DD": return pad2(f.day)
+      case "D": return String(f.day)
+      case "MMM": return MONTHS[f.month]
+      case "MM": return pad2(f.month + 1)
+    }
+    return t
+  })
+}
+
 // One grid cell's hour. The 12-hour form stays as short as worldtimebuddy's
 // ("1p", "11a") because a cell is only wide enough for three characters.
 function hourLabel(hour, use12Hour) {
@@ -148,12 +173,16 @@ function nowColumn(nowUtcMs, dayStartUtcMs) {
 }
 
 // Compact bar label shown on hover: "NY 07:12 · SF 04:12 · CDO 19:12".
-function compactLabel(zones, nowUtcMs, use12Hour) {
+// Local patch: with pinnedOnly, only zones configured with "expand": true are
+// listed (home included), so they stay visible in the bar without hover.
+function compactLabel(zones, nowUtcMs, use12Hour, pinnedOnly) {
   var parts = []
   for (var i = 0; i < zones.length; i++) {
     var z = zones[i]
-    if (z.home || z.offsetMin === undefined || z.offsetMin === null) continue
-    parts.push(plainText(z.shortLabel) + " " + timeLabel(nowUtcMs, z.offsetMin, use12Hour))
+    if (z.offsetMin === undefined || z.offsetMin === null) continue
+    if (pinnedOnly ? !z.expand : z.home) continue
+    var text = z.format ? formatTime(z.format, nowUtcMs, z.offsetMin) : timeLabel(nowUtcMs, z.offsetMin, use12Hour)
+    parts.push(plainText(z.shortLabel) + " " + text)
   }
   return parts.join(" · ")
 }

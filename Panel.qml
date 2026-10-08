@@ -100,6 +100,10 @@ Panel {
   }
 
   readonly property var zoneConfig: setting("zones", Model.defaultZones())
+  // Local patch: probe offsets again when shell.json hot-reloads the zone list.
+  // Otherwise a newly added zone has no offset (and no bar time) until the next
+  // hour boundary or until the popup is opened.
+  onZoneConfigChanged: refresh()
   // System timezones that keep the configured home label. Outside this list
   // (or with none configured) the home row is labeled by where the system
   // clock actually is, so traveling relabels it automatically.
@@ -127,6 +131,8 @@ Panel {
         shortLabel: Model.plainText(cfg.shortLabel || ""),
         abbr: Model.plainText(cfg.abbr || (probed ? probed.abbr : "")),
         home: cfg.home === true,
+        expand: cfg.expand === true,
+        format: Model.plainText(cfg.format || ""),
         offsetMin: probed ? probed.offsetMin : null
       })
     }
@@ -160,6 +166,7 @@ Panel {
 
   // What the bar pill shows on hover.
   readonly property string compactLabel: ready ? Model.compactLabel(zones, nowUtc, use12Hour) : ""
+  readonly property string pinnedLabel: ready ? Model.compactLabel(zones, nowUtc, use12Hour, true) : ""
 
   // ---- `p`: copy the popup as a PNG to the clipboard — hovered/selected
   //      column and its converted times included — so a future meeting slot
